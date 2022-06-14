@@ -1,19 +1,32 @@
 import { expect } from "chai";
+import { BigNumber, BigNumberish } from "ethers";
 import { ethers } from "hardhat";
+import { getPair, initLandscape, tokenBalanceOf } from "../scripts/deploy";
 
-describe("Greeter", function () {
-  it("Should return the new greeting once it's changed", async function () {
-    const Greeter = await ethers.getContractFactory("Greeter");
-    const greeter = await Greeter.deploy("Hello, world!");
-    await greeter.deployed();
+function units(value: BigNumberish): BigNumber {
+  return ethers.utils.parseUnits(value.toString(), 18);
+}
 
-    expect(await greeter.greet()).to.equal("Hello, world!");
-
-    const setGreetingTx = await greeter.setGreeting("Hola, mundo!");
-
-    // wait until the transaction is mined
-    await setGreetingTx.wait();
-
-    expect(await greeter.greet()).to.equal("Hola, mundo!");
+describe("Uniswap", function () {
+  it("Should deploy and initialize uniswap", async function () {
+    const [signer] = await ethers.getSigners();
+    const { exchanges, tokens } = await initLandscape(signer, {
+      A: units(150),
+      B: units(150)
+    }, [{
+      pairs: [{
+        reserves: [units(100), units(100)],
+        symbols: ["A", "B"]
+      }]
+    }]);
+    expect(exchanges.length).to.be.equal(1);
+    const [{ factory }] = exchanges;
+    const pairAddress = await getPair(signer, factory, tokens.A, tokens.B);
+    await Promise.all(["A", "B"].map(async (symbol) => {
+      const signerBalance = await tokenBalanceOf(signer.address, tokens[symbol]);
+      const pairBalance = await tokenBalanceOf(pairAddress, tokens[symbol]);
+      expect(signerBalance).to.be.equal(units(50));
+      expect(pairBalance).to.be.equal(units(100));
+    }));
   });
 });
