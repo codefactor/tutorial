@@ -33,6 +33,11 @@ const config: HardhatUserConfig = {
     }
   },
   networks: {
+    devnet: {
+      url: process.env.DEVNET_URL || "",
+      accounts:
+        process.env.DEVNET_KEY !== undefined ? [process.env.DEVNET_KEY] : [],
+    },
     ropsten: {
       url: process.env.ROPSTEN_URL || "",
       accounts:

@@ -5,6 +5,7 @@ import { abi as FactoryABI } from "../artifacts/@sushiswap/core/contracts/uniswa
 import { abi as RouterABI } from "../artifacts/@sushiswap/core/contracts/uniswapv2/interfaces/IUniswapV2Router02.sol/IUniswapV2Router02.json";
 import { abi as IERC20ABI } from "../artifacts/@openzeppelin/contracts/token/ERC20/IERC20.sol/IERC20.json";
 import { IERC20, IUniswapV2Factory, IUniswapV2Router02 } from "../typechain";
+import { waitForEach } from "./utils";
 
 export interface PairInfo {
   symbols: [string, string];
@@ -30,20 +31,20 @@ export async function initLandscape(signer: SignerWithAddress, tokenSupply: Reco
   const tokens: Record<string, string> = {
     WETH: await deployWeth()
   };
-  await Promise.all(Object.entries(tokenSupply).map(async ([symbol, supply]) => {
+  await waitForEach(Object.entries(tokenSupply), async ([symbol, supply]) => {
     tokens[symbol] = await deployToken(`${symbol} Token`, symbol, supply);
-  }));
-  await Promise.all(exchangeInput.map(async ({ pairs }) => {
+  });
+  await waitForEach(exchangeInput, async ({ pairs }) => {
     const uniswap = await deployUniswap(signer.address, tokens.WETH);
     const { router } = uniswap;
     exchanges.push(uniswap);
-    await Promise.all(pairs.map(async ({ reserves, symbols }) => {
-      await Promise.all(symbols.map(async (symbol, i) => {
+    await waitForEach(pairs, async ({ reserves, symbols }) => {
+      await waitForEach(symbols, async (symbol, i) => {
         await approveERC20(signer, tokens[symbol], router, reserves[i]);
-      }));
+      });
       await addLiquidity(signer, router, symbols.map((symbol) => tokens[symbol]) as [string, string], reserves);
-    }));
-  }))
+    });
+  })
   return {
     exchanges,
     tokens

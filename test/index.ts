@@ -1,11 +1,7 @@
 import { expect } from "chai";
-import { BigNumber, BigNumberish } from "ethers";
 import { ethers } from "hardhat";
 import { getPair, initLandscape, tokenBalanceOf } from "../scripts/deploy";
-
-function units(value: BigNumberish): BigNumber {
-  return ethers.utils.parseUnits(value.toString(), 18);
-}
+import { units } from "../scripts/utils";
 
 describe("Uniswap", function () {
   it("Should deploy and initialize uniswap", async function () {
