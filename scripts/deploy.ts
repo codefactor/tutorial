@@ -3,9 +3,10 @@ import { BigNumber, BigNumberish, Contract } from "ethers";
 import { ethers } from "hardhat";
 import { abi as FactoryABI } from "../artifacts/@sushiswap/core/contracts/uniswapv2/interfaces/IUniswapV2Factory.sol/IUniswapV2Factory.json";
 import { abi as RouterABI } from "../artifacts/@sushiswap/core/contracts/uniswapv2/interfaces/IUniswapV2Router02.sol/IUniswapV2Router02.json";
+import { abi as PairABI } from "../artifacts/@sushiswap/core/contracts/uniswapv2/interfaces/IUniswapV2Pair.sol/IUniswapV2Pair.json";
 import { abi as IERC20ABI } from "../artifacts/@openzeppelin/contracts/token/ERC20/IERC20.sol/IERC20.json";
-import { IERC20, IUniswapV2Factory, IUniswapV2Router02 } from "../typechain";
-import { waitForEach } from "./utils";
+import { IERC20, IUniswapV2Factory, IUniswapV2Pair, IUniswapV2Router02 } from "../typechain";
+import { units, waitForEach } from "./utils";
 
 export interface PairInfo {
   symbols: [string, string];
@@ -24,6 +25,34 @@ export interface UniswapInfo {
 export interface LandscapeInfo {
   exchanges: UniswapInfo[];
   tokens: Record<string, string>; // key symbol, value address
+}
+
+export async function initOpportunity(signer: SignerWithAddress): Promise<LandscapeInfo> {
+  return await initLandscape(signer, {
+    A: units(200),
+    B: units(300)
+  }, [{
+    pairs: [{
+      reserves: [units(100), units(100)],
+      symbols: ["A", "B"]
+    }]
+  }, {
+    pairs: [{
+      reserves: [units(100), units(200)],
+      symbols: ["A", "B"]
+    }]
+  }]);
+}
+
+export async function getPairAddress(factory: string, tokens: [string, string]): Promise<string> {
+  const factoryContract = new Contract(factory, FactoryABI, ethers.provider) as IUniswapV2Factory;
+  return factoryContract.getPair(...tokens);
+}
+
+export async function getReserves(pair: string): Promise<[BigNumber, BigNumber]> {
+  const pairContract = new Contract(pair, PairABI, ethers.provider) as IUniswapV2Pair;
+  const reserves = await pairContract.getReserves();
+  return reserves.slice(0, 2) as [BigNumber, BigNumber];
 }
 
 export async function initLandscape(signer: SignerWithAddress, tokenSupply: Record<string, BigNumberish>, exchangeInput: ExchangeInfo[]): Promise<LandscapeInfo> {
@@ -102,6 +131,14 @@ export async function addLiquidity(
     amounts,
     to: signer.address
   });
+}
+
+export async function deploySimpleFlash(): Promise<string> {
+  const SimpleFlash = await ethers.getContractFactory("SimpleFlash");
+  const flashContract = await SimpleFlash.deploy();
+  await flashContract.deployed();
+  console.log(`Deployed SimpleFlash: ${flashContract.address}`);
+  return flashContract.address;
 }
 
 export async function deployWeth(): Promise<string> {
