@@ -1,10 +1,40 @@
 import { expect } from "chai";
+import { BigNumber } from "ethers";
 import { ethers } from "hardhat";
 import { deploySimpleFlash, getPair, getPairAddress, initLandscape, initOpportunity, tokenBalanceOf } from "../scripts/deploy";
 import { executeSimpleFlash } from "../scripts/flashSwaps";
-import { getCurrencyString, units } from "../scripts/utils";
+import { getCurrencyString, getOptimalInput, getProfit, units } from "../scripts/utils";
 
 describe("Uniswap", function () {
+  it("Produces the maximum profit using the optimal input value", () => {
+    ([
+      [[units(100), units(100)], [units(100), units(200)]],
+      [[units(100), units(100)], [units(100), units(150)], [units(100), units(200)]],
+      [[units(100), units(100)], [units(100), units(150)], [units(100), units(200)], [units(100), units(100)]]
+    ] as [BigNumber, BigNumber][][]).forEach((reserves) => {
+      const optimalInput = getOptimalInput(reserves);
+      const maxProfit = getProfit(reserves, optimalInput);
+      const delta = units(0.01);
+      const otherInputs = [units(10), optimalInput.add(delta), optimalInput.sub(delta)];
+      console.log(`Optimal = ${getCurrencyString(optimalInput, "Units")} => ${getCurrencyString(maxProfit, "Units")}`);
+      otherInputs.forEach((amountIn, i) => {
+        const profit = getProfit(reserves, amountIn);
+        const diff = maxProfit.sub(profit);
+        console.log(`Other[${i}] = ${getCurrencyString(amountIn, "Units")} => ${getCurrencyString(profit, "Units")} (${getCurrencyString(diff, "Units")})`);
+        expect(maxProfit.gt(profit), "The max profit should be greater than any other profit").to.be.true;
+      });
+    });
+  });
+
+  it("Should return 0 if there is no way to make a profit", () => {
+    ([
+      [[units(100), units(100)], [units(100), units(100)]]
+    ] as [BigNumber, BigNumber][][]).forEach((reserves) => {
+      const optimalInput = getOptimalInput(reserves);
+      expect(optimalInput.eq(units(0)), "There is no optimal input for a bad path").to.be.true;
+    });
+  });
+
   it("Should make a profit using the flash swap contract", async () => {
     const [signer] = await ethers.getSigners();
     const landscape = await initOpportunity(signer);
